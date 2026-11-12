@@ -1,0 +1,73 @@
+{
+  "data": "/mnt/c/Users/athar/Documents/IIIT-Bangalore/SEAL-master/Bitcon_OTC_code/db/soc-sign-bitcoinalpha.csv",
+  "n_nodes": 3783,
+  "n_edges": 24186,
+  "train_edges": 19348,
+  "validation_edges": 2419,
+  "test_edges": 2419,
+  "hop": 1,
+  "max_nodes_per_hop": null,
+  "use_direction_features": true,
+  "crossfit_folds": 5,
+  "best_epoch": 46,
+  "metrics": {
+    "RMSE_normalized": 0.255316420377597,
+    "MAE_normalized": 0.14310179881785418,
+    "PCC": 0.552843193623791,
+    "R2": 0.30356589253474786,
+    "RMSE_rating": 2.55316420377597,
+    "MAE_rating": 1.4310179881785419,
+    "AUC": 0.8739570528077838,
+    "MicroF1": 0.9355105415460935,
+    "MacroF1": 0.7505315098051659,
+    "BinaryF1": 0.9653487338960463
+  },
+  "baseline_metrics": {
+    "GlobalMean": {
+      "RMSE_normalized": 0.305945584279804,
+      "MAE_normalized": 0.16156289383688954,
+      "PCC": NaN,
+      "R2": -2.5138538491065177e-05,
+      "RMSE_rating": 3.05945584279804,
+      "MAE_rating": 1.6156289383688955,
+      "AUC": 0.5,
+      "MicroF1": 0.9297230260438197,
+      "MacroF1": 0.4817909168808912,
+      "BinaryF1": 0.9635818337617824
+    },
+    "TargetInMean": {
+      "RMSE_normalized": 0.286962476460215,
+      "MAE_normalized": 0.16335204923132748,
+      "PCC": 0.4069207135172236,
+      "R2": 0.12022268037468942,
+      "RMSE_rating": 2.86962476460215,
+      "MAE_rating": 1.633520492313275,
+      "AUC": 0.7942078832422254,
+      "MicroF1": 0.9280694501860273,
+      "MacroF1": 0.7217466840134543,
+      "BinaryF1": 0.9613505108840514
+    },
+    "SourceOutMean": {
+      "RMSE_normalized": 0.2969756254287512,
+      "MAE_normalized": 0.16587701675922153,
+      "PCC": 0.27801109636189925,
+      "R2": 0.05775433111351436,
+      "RMSE_rating": 2.969756254287512,
+      "MAE_rating": 1.6587701675922153,
+      "AUC": 0.7474550780739152,
+      "MicroF1": 0.9140140553947912,
+      "MacroF1": 0.6709962597755865,
+      "BinaryF1": 0.953757225433526
+    }
+  },
+  "output_activation": "none",
+  "split": "random",
+  "seed": 1,
+  "train_edges_csv": "../output_models/SEAL+DIRECTION_COMPARISONS.train_edges.csv",
+  "feat_dim": 39,
+  "sort_k": 87,
+  "hidden": 128,
+  "learning_rate": 0.0001,
+  "batch_size": 50,
+  "epochs": 50
+}

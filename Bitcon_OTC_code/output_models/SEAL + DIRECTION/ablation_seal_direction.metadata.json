@@ -1,0 +1,60 @@
+{
+  "data": "/mnt/c/Users/athar/Documents/IIIT-Bangalore/SEAL-Master/Bitcon_OTC_code/db/soc-sign-bitcoinalpha.csv",
+  "n_nodes": 3783,
+  "n_edges": 24186,
+  "train_edges": 19348,
+  "validation_edges": 2419,
+  "test_edges": 2419,
+  "hop": 1,
+  "max_nodes_per_hop": null,
+  "use_fg": false,
+  "use_direction_features": true,
+  "fg_folds": 5,
+  "best_epoch": 29,
+  "metrics": {
+    "RMSE_normalized": 0.24093774804050613,
+    "MAE_normalized": 0.1394878884848484,
+    "PCC": 0.5191508978545882,
+    "R2": 0.26738750469135575,
+    "RMSE_rating": 2.409377480405061,
+    "MAE_rating": 1.3948788848484839
+  },
+  "baseline_metrics": {
+    "MeanRating": {
+      "RMSE_normalized": 0.2817262750725679,
+      "MAE_normalized": 0.14559510640057713,
+      "PCC": NaN,
+      "R2": -0.0016577008757869827,
+      "RMSE_rating": 2.8172627507256793,
+      "MAE_rating": 1.4559510640057713
+    },
+    "Goodness": {
+      "RMSE_normalized": 0.2670013147647611,
+      "MAE_normalized": 0.15204100986675456,
+      "PCC": 0.3566878302312071,
+      "R2": 0.10031303600494246,
+      "RMSE_rating": 2.6700131476476106,
+      "MAE_rating": 1.5204100986675457
+    },
+    "FxG": {
+      "RMSE_normalized": 0.26340664896102917,
+      "MAE_normalized": 0.1501861570667477,
+      "PCC": 0.3713943575874419,
+      "R2": 0.12437511699759318,
+      "RMSE_rating": 2.6340664896102917,
+      "MAE_rating": 1.5018615706674772
+    }
+  },
+  "output_activation": "tanh",
+  "split": "random",
+  "fga_iterations": 13,
+  "fga_converged": true,
+  "seed": 123,
+  "train_edges_csv": "ablation_seal_direction.train_edges.csv",
+  "feat_dim": 33,
+  "sort_k": 88,
+  "hidden": 128,
+  "learning_rate": 0.0001,
+  "batch_size": 32,
+  "epochs": 30
+}

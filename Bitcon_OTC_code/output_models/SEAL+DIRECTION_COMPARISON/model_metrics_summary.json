@@ -1,0 +1,199 @@
+{
+  "source_directory": "C:\\Users\\athar\\Documents\\IIIT-Bangalore\\SEAL-master\\Bitcon_OTC_code\\output_models\\SEAL+DIRECTION_COMPARISON",
+  "run_count": 8,
+  "shared_configuration": {
+    "data": "/mnt/c/Users/athar/Documents/IIIT-Bangalore/SEAL-master/Bitcon_OTC_code/db/soc-sign-bitcoinalpha.csv",
+    "n_nodes": 3783,
+    "n_edges": 24186,
+    "train_edges": 19348,
+    "validation_edges": 2419,
+    "test_edges": 2419,
+    "hop": 1,
+    "use_direction_features": true,
+    "crossfit_folds": 5,
+    "output_activation": "none",
+    "split": "random",
+    "seed": 1,
+    "feat_dim": 39,
+    "sort_k": 87
+  },
+  "runs": [
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b32-e50-hid128-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 32,
+        "learning_rate": 0.0005,
+        "hidden": 128
+      },
+      "best_epoch": 15,
+      "metrics": {
+        "RMSE_normalized": 0.2555244629435306,
+        "MAE_normalized": 0.14228255421372918,
+        "PCC": 0.5505843654753808,
+        "R2": 0.3024304624758284,
+        "RMSE_rating": 2.5552446294353057,
+        "MAE_rating": 1.4228255421372917,
+        "AUC": 0.8802225825857244,
+        "MicroF1": 0.9483257544439851,
+        "MacroF1": 0.7684967197162319,
+        "BinaryF1": 0.9725335091188749
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b50-e50-hid128-lr5e-05-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 50,
+        "learning_rate": 5e-05,
+        "hidden": 128
+      },
+      "best_epoch": 46,
+      "metrics": {
+        "RMSE_normalized": 0.25463444858077355,
+        "MAE_normalized": 0.14381482786028876,
+        "PCC": 0.555058177307699,
+        "R2": 0.3072813927379502,
+        "RMSE_rating": 2.5463444858077358,
+        "MAE_rating": 1.4381482786028876,
+        "AUC": 0.8897353071953549,
+        "MicroF1": 0.9408846630839189,
+        "MacroF1": 0.7628016690152193,
+        "BinaryF1": 0.9683277962347729
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b50-e50-hid128-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 50,
+        "learning_rate": 0.0005,
+        "hidden": 128
+      },
+      "best_epoch": 12,
+      "metrics": {
+        "RMSE_normalized": 0.2542201254852274,
+        "MAE_normalized": 0.14238187430157745,
+        "PCC": 0.5578639219061707,
+        "R2": 0.30953384380032345,
+        "RMSE_rating": 2.542201254852274,
+        "MAE_rating": 1.4238187430157745,
+        "AUC": 0.8896306855334397,
+        "MicroF1": 0.9466721785861927,
+        "MacroF1": 0.7700707580014456,
+        "BinaryF1": 0.9715796430931922
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b64-e50-hid64-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 64,
+        "learning_rate": 0.0005,
+        "hidden": 64
+      },
+      "best_epoch": 15,
+      "metrics": {
+        "RMSE_normalized": 0.25656268819092143,
+        "MAE_normalized": 0.14545774168314496,
+        "PCC": 0.544818206398944,
+        "R2": 0.29675033603391954,
+        "RMSE_rating": 2.565626881909214,
+        "MAE_rating": 1.4545774168314496,
+        "AUC": 0.8873080846389245,
+        "MicroF1": 0.9454319966928483,
+        "MacroF1": 0.7669066890921196,
+        "BinaryF1": 0.9708994708994709
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b64-e50-hid128-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 64,
+        "learning_rate": 0.0005,
+        "hidden": 128
+      },
+      "best_epoch": 12,
+      "metrics": {
+        "RMSE_normalized": 0.2528502634202084,
+        "MAE_normalized": 0.14184380450092315,
+        "PCC": 0.5636671925470234,
+        "R2": 0.3169549325903869,
+        "RMSE_rating": 2.5285026342020838,
+        "MAE_rating": 1.4184380450092315,
+        "AUC": 0.8701082834200822,
+        "MicroF1": 0.9462587846217445,
+        "MacroF1": 0.7812169533032782,
+        "BinaryF1": 0.9712389380530974
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b64-e50-hid256-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 64,
+        "learning_rate": 0.0005,
+        "hidden": 256
+      },
+      "best_epoch": 12,
+      "metrics": {
+        "RMSE_normalized": 0.2540846623573387,
+        "MAE_normalized": 0.14333648010148964,
+        "PCC": 0.5592592115592254,
+        "R2": 0.31026948803962073,
+        "RMSE_rating": 2.540846623573387,
+        "MAE_rating": 1.4333648010148963,
+        "AUC": 0.8902061046739728,
+        "MicroF1": 0.9495659363373294,
+        "MacroF1": 0.8038217525871878,
+        "BinaryF1": 0.9729129662522201
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b64-e50-hid512-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 50,
+        "batch_size": 64,
+        "learning_rate": 0.0005,
+        "hidden": 512
+      },
+      "best_epoch": 6,
+      "metrics": {
+        "RMSE_normalized": 0.2533172589855129,
+        "MAE_normalized": 0.14605777819641705,
+        "PCC": 0.5627448110114135,
+        "R2": 0.3144295361103996,
+        "RMSE_rating": 2.5331725898551287,
+        "MAE_rating": 1.4605777819641705,
+        "AUC": 0.8971686762744226,
+        "MicroF1": 0.9450186027284002,
+        "MacroF1": 0.764412504933595,
+        "F1": 0.9706854749834692,
+        "BinaryF1": 0.9706854749834692
+      }
+    },
+    {
+      "run_name": "soc-sign-bitcoinalpha-h1-nall-b64-e100-hid128-lr0.0005-s1-v0.1-t0.1-f5-anone-sprandom-don-mall",
+      "parameters": {
+        "epochs": 100,
+        "batch_size": 64,
+        "learning_rate": 0.0005,
+        "hidden": 128
+      },
+      "best_epoch": 19,
+      "metrics": {
+        "RMSE_normalized": 0.253984064389071,
+        "MAE_normalized": 0.1420819787458725,
+        "PCC": 0.5578930531373159,
+        "R2": 0.3108155403031111,
+        "RMSE_rating": 2.53984064389071,
+        "MAE_rating": 1.420819787458725,
+        "AUC": 0.8925313211100357,
+        "MicroF1": 0.9462587846217445,
+        "MacroF1": 0.7849830705021962,
+        "BinaryF1": 0.9712007089056269
+      }
+    }
+  ]
+}

@@ -22,269 +22,192 @@ import node2vec
 import multiprocessing as mp
 from itertools import islice
 
-def sample_neg(net, test_ratio=0.1, train_pos=None, test_pos=None, max_train_num=None,
-               all_unknown_as_negative=False):
-    # get upper triangular matrix
-    net_triu = ssp.triu(net, k=1)
-    # sample positive links for train/test
-    row, col, _ = ssp.find(net_triu)
-    # sample positive links if not specified
+"""Drop-in replacements for the corresponding functions in the pasted SEAL utility.
+
+These functions expect the same imports already present in the original utility:
+math, random, time, numpy as np, scipy.sparse as ssp, networkx as nx,
+from tqdm import tqdm, from sklearn import metrics, and multiprocessing as mp.
+"""
+
+
+def sample_neg(net, test_ratio=0.1, train_pos=None, test_pos=None,
+               max_train_num=None, all_unknown_as_negative=False):
+    """Sample unique undirected non-edges from the upper triangle.
+
+    In all_unknown_as_negative mode, train negatives are deliberately a subset
+    of the full unknown-edge test candidate set, matching the original option's
+    stated semantics. In the default mode, train/test negatives are disjoint.
+    """
+    net_triu = ssp.triu(net, k=1).tocsr()
+    row, col = ssp.find(net_triu)[:2]
+
     if train_pos is None and test_pos is None:
-        perm = random.sample(range(len(row)), len(row))
+        perm = np.random.permutation(len(row))
         row, col = row[perm], col[perm]
         split = int(math.ceil(len(row) * (1 - test_ratio)))
         train_pos = (row[:split], col[:split])
         test_pos = (row[split:], col[split:])
-    # if max_train_num is set, randomly sample train links
+
     if max_train_num is not None and train_pos is not None:
         perm = np.random.permutation(len(train_pos[0]))[:max_train_num]
-        train_pos = (train_pos[0][perm], train_pos[1][perm])
-    # sample negative links for train/test
-    train_num = len(train_pos[0]) if train_pos else 0
-    test_num = len(test_pos[0]) if test_pos else 0
-    neg = ([], [])
+        train_pos = (np.asarray(train_pos[0])[perm], np.asarray(train_pos[1])[perm])
+
+    train_num = len(train_pos[0]) if train_pos is not None else 0
+    test_num = len(test_pos[0]) if test_pos is not None else 0
     n = net.shape[0]
-    print('sampling negative links for train and test')
-    if not all_unknown_as_negative:
-        # sample a portion unknown links as train_negs and test_negs (no overlap)
-        while len(neg[0]) < train_num + test_num:
-            i, j = random.randint(0, n-1), random.randint(0, n-1)
-            if i < j and net[i, j] == 0:
-                neg[0].append(i)
-                neg[1].append(j)
-            else:
-                continue
-        train_neg  = (neg[0][:train_num], neg[1][:train_num])
-        test_neg = (neg[0][train_num:], neg[1][train_num:])
+    total_pairs = n * (n - 1) // 2
+    unknown_count = total_pairs - net_triu.nnz
+
+    if all_unknown_as_negative:
+        needed = train_num
     else:
-        # regard all unknown links as test_negs, sample a portion from them as train_negs
-        while len(neg[0]) < train_num:
-            i, j = random.randint(0, n-1), random.randint(0, n-1)
-            if i < j and net[i, j] == 0:
-                neg[0].append(i)
-                neg[1].append(j)
-            else:
-                continue
-        train_neg  = (neg[0], neg[1])
-        test_neg_i, test_neg_j, _ = ssp.find(ssp.triu(net==0, k=1))
+        needed = train_num + test_num
+    if needed > unknown_count:
+        raise ValueError(
+            f"Requested {needed} unique negative pairs, but only "
+            f"{unknown_count} unknown upper-triangular pairs exist."
+        )
+
+    print('sampling negative links for train and test')
+    selected = set()
+    # Rejection sampling avoids materializing the O(n^2) complement of a sparse graph.
+    while len(selected) < needed:
+        i = random.randint(0, n - 1)
+        j = random.randint(0, n - 1)
+        if i < j and net[i, j] == 0 and (i, j) not in selected:
+            selected.add((i, j))
+
+    selected = list(selected)
+    neg_i = [p[0] for p in selected]
+    neg_j = [p[1] for p in selected]
+    train_neg = (neg_i[:train_num], neg_j[:train_num])
+
+    if all_unknown_as_negative:
+        test_neg_i, test_neg_j = ssp.find(ssp.triu(net == 0, k=1))[:2]
         test_neg = (test_neg_i.tolist(), test_neg_j.tolist())
+    else:
+        test_neg = (neg_i[train_num:train_num + test_num],
+                    neg_j[train_num:train_num + test_num])
+
     return train_pos, train_neg, test_pos, test_neg
 
-    
-def links2subgraphs(A, train_pos, train_neg, test_pos, test_neg, h=1, 
-                    max_nodes_per_hop=None, node_information=None, no_parallel=False):
-    # automatically select h from {1, 2}
+
+def links2subgraphs(A, train_pos, train_neg, test_pos, test_neg, h=1,
+                    max_nodes_per_hop=None, node_information=None,
+                    no_parallel=False, directed=False):
+    """Extract subgraphs; explicitly propagate directed mode to every worker."""
     if h == 'auto':
-        # split train into val_train and val_test
+        if directed:
+            raise ValueError(
+                "Automatic h selection uses undirected CN/AA heuristics. Choose "
+                "h=1 or h=2 explicitly for a directed task."
+            )
         _, _, val_test_pos, val_test_neg = sample_neg(A, 0.1)
         val_A = A.copy()
         val_A[val_test_pos[0], val_test_pos[1]] = 0
         val_A[val_test_pos[1], val_test_pos[0]] = 0
         val_auc_CN = CN(val_A, val_test_pos, val_test_neg)
         val_auc_AA = AA(val_A, val_test_pos, val_test_neg)
-        print('\033[91mValidation AUC of AA is {}, CN is {}\033[0m'.format(
-            val_auc_AA, val_auc_CN))
-        if val_auc_AA >= val_auc_CN:
-            h = 2
-            print('\033[91mChoose h=2\033[0m')
-        else:
-            h = 1
-            print('\033[91mChoose h=1\033[0m')
+        print('Validation AUC of AA is {}, CN is {}'.format(val_auc_AA, val_auc_CN))
+        h = 2 if val_auc_AA >= val_auc_CN else 1
+        print('Choose h={}'.format(h))
 
-    # extract enclosing subgraphs
     max_n_label = {'value': 0}
-    def helper(A, links, g_label):
-        g_list = []
+
+    def helper(links, g_label):
+        if links is None or len(links[0]) == 0:
+            return []
+        args = [((i, j), A, h, max_nodes_per_hop, node_information,
+                 False, directed)
+                for i, j in zip(links[0], links[1])]
         if no_parallel:
-            for i, j in tqdm(zip(links[0], links[1])):
-                g, n_labels, n_features = subgraph_extraction_labeling(
-                    (i, j), A, h, max_nodes_per_hop, node_information
-                )
-                max_n_label['value'] = max(max(n_labels), max_n_label['value'])
-                g_list.append(GNNGraph(g, g_label, n_labels, n_features))
-            return g_list
+            results = [parallel_worker(x) for x in tqdm(args)]
         else:
-            # the parallel extraction code
             start = time.time()
-            pool = mp.Pool(mp.cpu_count())
-            results = pool.map_async(
-                parallel_worker, 
-                [((i, j), A, h, max_nodes_per_hop, node_information) for i, j in zip(links[0], links[1])]
-            )
-            remaining = results._number_left
-            pbar = tqdm(total=remaining)
-            while True:
-                pbar.update(remaining - results._number_left)
-                if results.ready(): break
-                remaining = results._number_left
-                time.sleep(1)
-            results = results.get()
-            pool.close()
-            pbar.close()
-            g_list = [GNNGraph(g, g_label, n_labels, n_features) for g, n_labels, n_features in results]
-            max_n_label['value'] = max(
-                max([max(n_labels) for _, n_labels, _ in results]), max_n_label['value']
-            )
-            end = time.time()
-            print("Time eplased for subgraph extraction: {}s".format(end-start))
-            return g_list
+            with mp.Pool(mp.cpu_count()) as pool:
+                results = list(tqdm(pool.imap(parallel_worker, args), total=len(args)))
+            print(f"Time elapsed for subgraph extraction: {time.time() - start:.2f}s")
+
+        graphs = []
+        for g, labels, features in results:
+            if len(labels):
+                max_n_label['value'] = max(max_n_label['value'], max(labels))
+            graphs.append(GNNGraph(g, g_label, labels, features))
+        return graphs
 
     print('Enclosing subgraph extraction begins...')
-    train_graphs, test_graphs = None, None
-    if train_pos and train_neg:
-        train_graphs = helper(A, train_pos, 1) + helper(A, train_neg, 0)
-    if test_pos and test_neg:
-        test_graphs = helper(A, test_pos, 1) + helper(A, test_neg, 0)
-    elif test_pos:
-        test_graphs = helper(A, test_pos, 1)
+    train_graphs = helper(train_pos, 1) + helper(train_neg, 0)
+    test_graphs = helper(test_pos, 1) + helper(test_neg, 0)
     return train_graphs, test_graphs, max_n_label['value']
+
 
 def parallel_worker(x):
     return subgraph_extraction_labeling(*x)
 
+
 def subgraph_extraction_labeling(ind, A, h=1, max_nodes_per_hop=None,
                                  node_information=None, return_nodes=False,
                                  directed=False):
-    # extract the h-hop enclosing subgraph around link 'ind'
-    nodes = set([ind[0], ind[1]])
-    visited = set([ind[0], ind[1]])
-    fringe = set([ind[0], ind[1]])
-    for dist in range(1, h+1):
-        fringe = neighbors(fringe, A, directed=directed)
-        fringe = fringe - visited
-        visited = visited.union(fringe)
-        if max_nodes_per_hop is not None:
-            if max_nodes_per_hop < len(fringe):
-                fringe = random.sample(fringe, max_nodes_per_hop)
-        if len(fringe) == 0:
+    """Extract an enclosing subgraph and optionally use directed distance labels."""
+    nodes = {ind[0], ind[1]}
+    visited = {ind[0], ind[1]}
+    fringe = {ind[0], ind[1]}
+
+    for _ in range(1, h + 1):
+        fringe = neighbors(fringe, A, directed=directed) - visited
+        visited.update(fringe)
+        if max_nodes_per_hop is not None and max_nodes_per_hop < len(fringe):
+            fringe = set(random.sample(sorted(fringe), max_nodes_per_hop))
+        if not fringe:
             break
-        nodes = nodes.union(fringe)
-    # move target nodes to top
-    nodes.remove(ind[0])
-    nodes.remove(ind[1])
-    nodes = [ind[0], ind[1]] + list(nodes) 
+        nodes.update(fringe)
+
+    # Keep query endpoints at local indices 0 and 1; sort all other nodes for
+    # deterministic local indexing across repeated runs.
+    nodes.discard(ind[0])
+    nodes.discard(ind[1])
+    nodes = [ind[0], ind[1]] + sorted(nodes)
     subgraph = A[nodes, :][:, nodes].tocsr(copy=True)
+
     if directed:
-        # Mask only the queried direction; a reverse edge remains observable.
+        # Mask u->v only; v->u remains available if observed in the context.
         subgraph = subgraph.tolil(copy=True)
         subgraph[0, 1] = 0
         subgraph = subgraph.tocsr()
         subgraph.eliminate_zeros()
-    # apply node-labeling
-    labels = node_label(subgraph, directed=directed)
-    # get node features
-    features = None
-    if node_information is not None:
-        features = node_information[nodes]
-    # construct nx graph
-    if directed:
-        g = nx.from_scipy_sparse_matrix(subgraph, create_using=nx.DiGraph())
     else:
-        g = nx.from_scipy_sparse_matrix(subgraph)
-    # remove link between target nodes
-    if not directed and g.has_edge(0, 1):
-        g.remove_edge(0, 1)
+        subgraph = subgraph.tolil(copy=True)
+        subgraph[0, 1] = 0
+        subgraph[1, 0] = 0
+        subgraph = subgraph.tocsr()
+        subgraph.eliminate_zeros()
+
+    labels = node_label(subgraph, directed=directed)
+    features = None if node_information is None else node_information[nodes]
+    if directed:
+        # Compatibility across NetworkX releases.
+        if hasattr(nx, 'from_scipy_sparse_array'):
+            g = nx.from_scipy_sparse_array(subgraph, create_using=nx.DiGraph())
+        else:
+            g = nx.from_scipy_sparse_matrix(subgraph, create_using=nx.DiGraph())
+    else:
+        if hasattr(nx, 'from_scipy_sparse_array'):
+            g = nx.from_scipy_sparse_array(subgraph)
+        else:
+            g = nx.from_scipy_sparse_matrix(subgraph)
+
     if return_nodes:
         return g, labels.tolist(), features, nodes
     return g, labels.tolist(), features
 
 
 def neighbors(fringe, A, directed=False):
-    # find all 1-hop neighbors of nodes in fringe from A
+    """Return incoming neighbours, plus outgoing neighbours in directed mode."""
     res = set()
     for node in fringe:
-        nei, _, _ = ssp.find(A[:, node])
-        nei = set(nei)
+        incoming, _, _ = ssp.find(A[:, node])
+        res.update(incoming.tolist())
         if directed:
-            _, nei_out, _ = ssp.find(A[node, :])
-            nei.update(nei_out)
-        res = res.union(nei)
+            _, outgoing, _ = ssp.find(A[node, :])
+            res.update(outgoing.tolist())
     return res
-
-
-def node_label(subgraph, directed=False):
-    if directed:
-        dist_from_source = ssp.csgraph.shortest_path(
-            subgraph, directed=True, unweighted=True, indices=0
-        )
-        dist_to_target = ssp.csgraph.shortest_path(
-            subgraph.transpose(), directed=True, unweighted=True, indices=1
-        )
-        distances = np.column_stack([dist_from_source, dist_to_target])
-        distances[~np.isfinite(distances)] = -1
-        return distances.astype(np.int64)
-
-    # an implementation of the proposed double-radius node labeling (DRNL)
-    K = subgraph.shape[0]
-    subgraph_wo0 = subgraph[1:, 1:]
-    subgraph_wo1 = subgraph[[0]+list(range(2, K)), :][:, [0]+list(range(2, K))]
-    dist_to_0 = ssp.csgraph.shortest_path(subgraph_wo0, directed=False, unweighted=True)
-    dist_to_0 = dist_to_0[1:, 0]
-    dist_to_1 = ssp.csgraph.shortest_path(subgraph_wo1, directed=False, unweighted=True)
-    dist_to_1 = dist_to_1[1:, 0]
-    labels = np.zeros(K, dtype=int)
-    labels[:2] = 1
-    finite = np.isfinite(dist_to_0) & np.isfinite(dist_to_1)
-    d = (dist_to_0[finite] + dist_to_1[finite]).astype(int)
-    d_over_2, d_mod_2 = np.divmod(d, 2)
-    node_labels = (
-        1 + np.minimum(dist_to_0[finite], dist_to_1[finite]).astype(int)
-        + d_over_2 * (d_over_2 + d_mod_2 - 1)
-    )
-    node_labels[node_labels > 1e6] = 0
-    labels[np.flatnonzero(finite) + 2] = node_labels
-    return labels
-
-    
-def generate_node2vec_embeddings(A, emd_size=128, negative_injection=False, train_neg=None):
-    if negative_injection:
-        row, col = train_neg
-        A = A.copy()
-        A[row, col] = 1  # inject negative train
-        A[col, row] = 1  # inject negative train
-    nx_G = nx.from_scipy_sparse_matrix(A)
-    G = node2vec.Graph(nx_G, is_directed=False, p=1, q=1)
-    G.preprocess_transition_probs()
-    walks = G.simulate_walks(num_walks=10, walk_length=80)
-    walks = [list(map(str, walk)) for walk in walks]
-    model = Word2Vec(walks, size=emd_size, window=10, min_count=0, sg=1, 
-            workers=8, iter=1)
-    wv = model.wv
-    embeddings = np.zeros([A.shape[0], emd_size], dtype='float32')
-    sum_embeddings = 0
-    empty_list = []
-    for i in range(A.shape[0]):
-        if str(i) in wv:
-            embeddings[i] = wv.word_vec(str(i))
-            sum_embeddings += embeddings[i]
-        else:
-            empty_list.append(i)
-    mean_embedding = sum_embeddings / (A.shape[0] - len(empty_list))
-    embeddings[empty_list] = mean_embedding
-    return embeddings
-
-
-def AA(A, test_pos, test_neg):
-    # Adamic-Adar score
-    A_ = A / np.log(A.sum(axis=1))
-    A_[np.isnan(A_)] = 0
-    A_[np.isinf(A_)] = 0
-    sim = A.dot(A_)
-    return CalcAUC(sim, test_pos, test_neg)
-    
-        
-def CN(A, test_pos, test_neg):
-    # Common Neighbor score
-    sim = A.dot(A)
-    return CalcAUC(sim, test_pos, test_neg)
-
-
-def CalcAUC(sim, test_pos, test_neg):
-    pos_scores = np.asarray(sim[test_pos[0], test_pos[1]]).squeeze()
-    neg_scores = np.asarray(sim[test_neg[0], test_neg[1]]).squeeze()
-    scores = np.concatenate([pos_scores, neg_scores])
-    labels = np.hstack([np.ones(len(pos_scores)), np.zeros(len(neg_scores))])
-    fpr, tpr, _ = metrics.roc_curve(labels, scores, pos_label=1)
-    auc = metrics.auc(fpr, tpr)
-    return auc
-

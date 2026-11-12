@@ -151,15 +151,14 @@ def make_graph(edge_row, A, hop, max_nodes_per_hop, pair_features=None,
     graph.directed_distances = np.asarray(distances, dtype=np.int64)
     directed_edges, directed_weights = [], []
     if directed_weight_map:
+        # g is already a DiGraph: each observed orientation appears once in g.edges().
+        # Do not synthesize the reverse orientation here. Doing so duplicates reciprocal
+        # edges whenever both u->v and v->u exist, changing DUNE propagation and degrees.
         for u, v in g.edges():
-            global_u, global_v = int(nodes[u]), int(nodes[v])
-            for edge, local_edge in (
-                ((global_u, global_v), (u, v)),
-                ((global_v, global_u), (v, u)),
-            ):
-                if edge != (src, dst) and edge in directed_weight_map:
-                    directed_edges.append(local_edge)
-                    directed_weights.append(directed_weight_map[edge])
+            global_edge = (int(nodes[u]), int(nodes[v]))
+            if global_edge != (src, dst) and global_edge in directed_weight_map:
+                directed_edges.append((u, v))
+                directed_weights.append(directed_weight_map[global_edge])
     graph.dune_edge_pairs = np.asarray(directed_edges, dtype=np.int64).reshape(-1, 2).T
     graph.dune_edge_weights = np.asarray(directed_weights, dtype=np.float32)
     graph.src_id, graph.dst_id = src, dst
@@ -266,8 +265,9 @@ class SEALWeightRegressor(nn.Module):
         distance_indices = torch.where(
             distance_indices < 0, 0, distance_indices + 1
         )
-        if distance_indices.numel() and distance_indices.max() >= feat_dim:
-            raise ValueError("cmd_args.feat_dim is too small for directed distances")
+        # Index 0 = unreachable; indices 1..feat_dim-1 = observed distances,
+        # with the last index also serving as an overflow bucket at evaluation.
+        distance_indices = distance_indices.clamp(max=feat_dim - 1)
         structural_features = torch.cat([
             F.one_hot(distance_indices[:, col], num_classes=feat_dim)
             for col in range(2)
@@ -512,10 +512,12 @@ def main():
             direction_stats=direction_stats_train, use_direction_features=True, desc="test graphs",
             directed_weight_map=directed_weight_map)
     else:
-        print("Building standard SEAL graphs (no direction features)...")
-        train_graphs = build_graph_dataset(train_df, A_train, args.hop, args.max_nodes_per_hop,
-                                           use_direction_features=False, desc="training graphs",
-                                           directed_weight_map=directed_weight_map)
+        print("Building leakage-safe cross-fitted training graphs (no direction features)...")
+        # Cross-fitting is required even without direction-statistic features: otherwise
+        # the query edge remains in A_train during its own training-subgraph extraction.
+        train_graphs = build_crossfit_train_graphs(
+            train_df, n_nodes, args.hop, args.max_nodes_per_hop, args.crossfit_folds, args.seed,
+            use_direction_features=False)
         val_graphs = build_graph_dataset(val_df, A_train, args.hop, args.max_nodes_per_hop,
                                          use_direction_features=False, desc="validation graphs",
                                          directed_weight_map=directed_weight_map)
@@ -523,10 +525,12 @@ def main():
                                           use_direction_features=False, desc="test graphs",
                                           directed_weight_map=directed_weight_map)
 
-    all_graphs = train_graphs + val_graphs + test_graphs
+    # Fit the structural-distance vocabulary on training graphs only. Reserve index 0
+    # for unreachable distances and the final category for distances beyond the
+    # training-observed range (an overflow bucket for validation/test graphs).
     max_directed_distance = max(
         (int(g.directed_distances[g.directed_distances >= 0].max())
-         for g in all_graphs if np.any(g.directed_distances >= 0)),
+         for g in train_graphs if np.any(g.directed_distances >= 0)),
         default=0,
     )
     cmd_args.feat_dim = max_directed_distance + 2
@@ -596,13 +600,16 @@ def main():
         "train_edges": len(train_df), "validation_edges": len(val_df), "test_edges": len(test_df),
         "hop": args.hop, "max_nodes_per_hop": args.max_nodes_per_hop,
         "use_direction_features": args.use_direction_features,
-        "crossfit_folds": args.crossfit_folds if args.use_direction_features else None,
+        "crossfit_folds": args.crossfit_folds,
         "best_epoch": best_epoch, "metrics": metrics, "baseline_metrics": baseline_metrics,
         "output_activation": args.output_activation, "split": args.split,
         "seed": args.seed,
         "train_edges_csv": str(pred_path.with_suffix(".train_edges.csv")),
         "run_directory": str(run_dir),
         "node_map": node_map, "feat_dim": cmd_args.feat_dim,
+        "dune_config": {"hidden_dim": 64, "num_layers": 3,
+                        "taylor_order": 10, "diffusion_time": 0.1,
+                        "normalize_operator": True},
         "node_attr_dim": node_attr_dim,
         "encoder": "DUNE", "encoder_embedding_dim": model.gnn.embedding_dim,
         "hidden": args.hidden, "learning_rate": args.learning_rate,
